@@ -1,0 +1,180 @@
+# Aurora Security Intel Hub - Example Configuration
+# Time format: Go duration (e.g., 30s, 5m, 2h)
+
+archive:
+  driver: sqlite
+  path: ./data/asih.db
+  wal: true
+  busy_timeout_ms: 5000
+  migrate_on_start: true
+
+pipeline:
+  mode: once              # once | daemon
+  interval: 30m           # daemon 模式生效
+  jitter: 3m              # daemon 模式生效（可选）
+  concurrency: 1          # MVP 建议 1
+  max_push_per_run: 30    # 防刷屏护栏（强烈建议）
+  default_push_policy: push
+  drop_if_published_before_days: 30  # 历史回流护栏：早于 now-30d 仅入库不推送
+  dry_run: false          # true: 不推送，仅抓取+入库（灰度用）
+
+http:
+  timeout: 15s
+  user_agent: "AuroraSecurityIntelHub/0.1"
+  proxy: ""
+  retry:
+    max: 1
+    backoff: 2s
+  rate_limit:
+    default_rps: 0.5
+    per_host:
+      "www.reddit.com": 0.1
+
+notifier:
+  wecom:
+    webhook_url: "${WECOM_WEBHOOK_URL}"
+    template: "default"
+    timeout: 10s
+    retry:
+      max: 1
+      backoff: 2s
+
+# Sources
+# 默认策略（已确认）：
+# - priority=P2 默认 archive_only（仅入库不推送）
+# - published_at < now-30d 默认仅入库不推送（可源级覆盖）
+sources:
+  # P0
+  - source_id: rss_xz_aliyun
+    type: rss
+    url: https://xz.aliyun.com/feed
+    interval: 30m
+    priority: P0
+    fingerprint_fields: [url]
+    push_policy: push
+    enabled: true
+    tags: ["cn", "article"]
+
+  - source_id: rss_butian_forum
+    type: rss
+    url: https://forum.butian.net/Rss
+    interval: 30m
+    priority: P0
+    fingerprint_fields: [url, title]
+    push_policy: push
+    enabled: true
+    tags: ["cn", "community"]
+    notes:
+      drop_if_published_before_days: 30
+
+  - source_id: rss_exploit_db
+    type: rss
+    url: https://www.exploit-db.com/rss.xml
+    interval: 6h
+    priority: P0
+    fingerprint_fields: [url, title]
+    push_policy: push
+    enabled: true
+    tags: ["en", "vuln-db"]
+
+  - source_id: rss_cisco_psirt
+    type: rss
+    url: https://sec.cloudapps.cisco.com/security/center/rss.x?i=44
+    interval: 6h
+    priority: P0
+    fingerprint_fields: [url, title]
+    push_policy: push
+    enabled: true
+    tags: ["en", "advisory", "vendor"]
+
+  # P1
+  - source_id: rss_freebuf
+    type: rss
+    url: https://www.freebuf.com/feed
+    interval: 1h
+    priority: P1
+    fingerprint_fields: [url]
+    push_policy: push
+    enabled: true
+    tags: ["cn", "media"]
+
+  - source_id: rss_anquanke
+    type: rss
+    url: https://api.anquanke.com/data/v1/rss
+    interval: 1h
+    priority: P1
+    fingerprint_fields: [url]
+    push_policy: push
+    enabled: true
+    tags: ["cn", "media"]
+
+  - source_id: rss_52pojie_forum
+    type: rss
+    url: https://www.52pojie.cn/forum.php?mod=rss
+    interval: 2h
+    priority: P1
+    fingerprint_fields: [url, title]
+    push_policy: push
+    enabled: true
+    tags: ["cn", "community"]
+
+  - source_id: rss_kanxue_bbs
+    type: rss
+    url: https://bbs.kanxue.com/rss.php
+    interval: 2h
+    priority: P1
+    fingerprint_fields: [url, title]
+    push_policy: push
+    enabled: true
+    tags: ["cn", "community", "reverse"]
+
+  - source_id: rss_cert_eu_advisories
+    type: rss
+    url: https://cert.europa.eu/publications/security-advisories-rss
+    interval: 12h
+    priority: P1
+    fingerprint_fields: [url, title]
+    push_policy: push
+    enabled: true
+    tags: ["en", "advisory", "cert"]
+
+  # P2 (archive only)
+  - source_id: rss_reddit_netsec
+    type: rss
+    url: https://www.reddit.com/r/netsec/.rss
+    interval: 6h
+    priority: P2
+    fingerprint_fields: [url, title]
+    push_policy: archive_only
+    enabled: true
+    tags: ["en", "community", "risk-429"]
+
+  - source_id: rss_security_stackexchange_all
+    type: rss
+    url: https://security.stackexchange.com/feeds
+    interval: 12h
+    priority: P2
+    fingerprint_fields: [url, title]
+    push_policy: archive_only
+    enabled: true
+    tags: ["en", "qna"]
+
+  - source_id: rss_security_stackexchange_web_security
+    type: rss
+    url: https://security.stackexchange.com/feeds/tag/web-security
+    interval: 12h
+    priority: P2
+    fingerprint_fields: [url, title]
+    push_policy: archive_only
+    enabled: true
+    tags: ["en", "qna", "web"]
+
+  - source_id: rss_0x00sec
+    type: rss
+    url: https://0x00sec.org/feed.xml
+    interval: 12h
+    priority: P2
+    fingerprint_fields: [url, title]
+    push_policy: archive_only
+    enabled: true
+    tags: ["en", "community"]
